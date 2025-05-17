@@ -68,7 +68,12 @@ To set up the code, follow these steps:
    cd SelfMAD_Combined
    ```
 
-2. Create and activate the conda environment:
+2. Download the ViT-MAE model:
+   The ViT-MAE large model file is too large for GitHub. You need to download it separately:
+   - Download the ViT-MAE large model from [Hugging Face](https://huggingface.co/facebook/vit-mae-large)
+   - Save the `pytorch_model.bin` file to the `models/vit_mae/` directory
+
+3. Create and activate the conda environment:
    ```
    # For SelfMAD-main
    cd SelfMAD-main/conda
@@ -81,7 +86,7 @@ To set up the code, follow these steps:
    conda activate selfmad-siam
    ```
 
-3. Run the experiments:
+4. Run the experiments:
    ```
    python run_experiments.py
    ```

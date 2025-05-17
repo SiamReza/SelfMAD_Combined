@@ -47,6 +47,8 @@ SelfMAD-siam/datasets/**/*.npz
 *.pb
 *.onnx
 *.weights
+*.bin
+models/vit_mae/pytorch_model.bin
 *.tar
 
 # Logs
