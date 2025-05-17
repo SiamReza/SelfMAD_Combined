@@ -9,7 +9,7 @@ Modify the values in this file to customize the behavior of the automation scrip
 # -----------------
 
 # List of datasets to process
-DATASETS = ["LMA_MIPGAN_I"]  # Options: "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"
+DATASETS = ["LMA", "LMA_MIPGAN_I", "MIPGAN_I"]  # Options: "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"
 
 # Enable combined dataset loading for training
 # When True, all datasets in DATASETS will be combined for training
@@ -47,7 +47,7 @@ DATASET_PATHS = {
 SIAM_MODEL = "vit_mae_large"  # Model type (vit_mae_large)
 SIAM_BATCH_SIZE = 64          # Batch size for training
 SIAM_EPOCHS =120               # Number of epochs for training (reduced for testing)
-SIAM_LEARNING_RATE = 5e-3     # Learning rate for training
+SIAM_LEARNING_RATE = 4e-4     # Learning rate for training
 SIAM_IMAGE_SIZE = 224         # Image size for training (224x224)
 
 # Training parameters
@@ -66,14 +66,19 @@ SIAM_APCER_THRESHOLDS = [0.05, 0.10, 0.20]  # APCER thresholds for BPCER calcula
 SIAM_SCHEDULER = "cosine"              # Learning rate scheduler (cosine or linear)
 
 # ViT MAE improvement parameters
-SIAM_VIT_UNFREEZE_LAYERS = 6           # Number of encoder layers to unfreeze (0 to freeze all)
+SIAM_VIT_UNFREEZE_LAYERS = 8           # Number of encoder layers to unfreeze (0 to freeze all)
 SIAM_VIT_USE_ADAMW = True              # Use AdamW optimizer instead of SAM+SGD
 SIAM_VIT_ENCODER_WEIGHT_DECAY = 0.05   # Weight decay for encoder parameters
 SIAM_VIT_CLASSIFIER_WEIGHT_DECAY = 0.01 # Weight decay for classifier parameters
 SIAM_VIT_WARMUP_PERCENTAGE = 0.25       # Percentage of total steps for learning rate warm-up
-SIAM_VIT_LABEL_SMOOTHING = 0.1         # Label smoothing factor for CrossEntropyLoss
+SIAM_VIT_LABEL_SMOOTHING = 0.1         # Label smoothing factor for BCELoss
 SIAM_VIT_GRADIENT_ACCUMULATION_STEPS = 2 # Number of steps to accumulate gradients for large models (4-8 recommended)
 SIAM_VIT_ADVANCED_AUGMENTATIONS = True # Use advanced augmentations for better generalization
+
+# Loss function parameters
+SIAM_LOSS_TYPE = 'focal_smoothing'       # Loss function type: 'bce', 'bce_smoothing', 'focal', 'focal_smoothing'
+SIAM_FOCAL_ALPHA = 0.36                # Alpha parameter for Focal Loss (weighting factor for rare class)
+SIAM_FOCAL_GAMMA = 2.0                 # Gamma parameter for Focal Loss (focusing parameter)
 
 # Resume training parameters (SelfMAD-siam)
 SIAM_RESUME_TRAINING = False        # Whether to resume training from a checkpoint
@@ -212,6 +217,11 @@ def get_config():
     config["siam_vit_label_smoothing"] = SIAM_VIT_LABEL_SMOOTHING
     config["siam_vit_gradient_accumulation_steps"] = SIAM_VIT_GRADIENT_ACCUMULATION_STEPS
     config["siam_vit_advanced_augmentations"] = SIAM_VIT_ADVANCED_AUGMENTATIONS
+
+    # Add loss function parameters to config
+    config["siam_loss_type"] = SIAM_LOSS_TYPE
+    config["siam_focal_alpha"] = SIAM_FOCAL_ALPHA
+    config["siam_focal_gamma"] = SIAM_FOCAL_GAMMA
 
     # Add resume training parameters to config
     config["siam_resume_training"] = SIAM_RESUME_TRAINING

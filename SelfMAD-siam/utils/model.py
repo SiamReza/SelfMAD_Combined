@@ -11,6 +11,7 @@ import json
 import numpy as np
 from transformers import ViTMAEModel
 from torch.optim import AdamW
+from utils.loss import smooth_targets, get_loss_function
 
 class Detector(nn.Module):
 
@@ -120,9 +121,30 @@ class Detector(nn.Module):
             classifier_weight_decay = 0.01
             label_smoothing = 0.1
 
-        # Use BCE loss for binary classification
-        # Note: BCELoss doesn't support label_smoothing parameter
-        self.cel = nn.BCELoss()
+        # Get loss function configuration
+        try:
+            import sys
+            sys.path.append('..')
+            from automation_config import get_config
+            cfg = get_config()
+            loss_type = cfg.get("siam_loss_type", "bce_smoothing")
+            label_smoothing = cfg.get("siam_vit_label_smoothing", 0.1)
+            focal_alpha = cfg.get("siam_focal_alpha", 0.25)
+            focal_gamma = cfg.get("siam_focal_gamma", 2.0)
+        except (ImportError, AttributeError):
+            # Default values if config is not available
+            loss_type = "bce_smoothing"
+            label_smoothing = 0.1
+            focal_alpha = 0.25
+            focal_gamma = 2.0
+
+        # Create loss function based on configuration
+        self.cel = get_loss_function(
+            loss_type=loss_type,
+            label_smoothing=label_smoothing,
+            focal_alpha=focal_alpha,
+            focal_gamma=focal_gamma
+        )
 
         # Use AdamW optimizer with layer-wise learning rates for ViT MAE
         if model == "vit_mae_large" and use_adamw:
@@ -193,6 +215,9 @@ class Detector(nn.Module):
             raise RuntimeError(error_msg) from e
 
     def training_step(self,x,target):
+        # Note: We don't need to apply label smoothing here anymore
+        # as it's handled by the loss function itself if needed
+
         for i in range(2):
             pred_cls=self(x)
             if i==0:

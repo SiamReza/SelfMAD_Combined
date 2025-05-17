@@ -1,0 +1,21 @@
+Best model: epoch 1
+Test metrics: {
+    "accuracy": 0.28861814752213605,
+    "precision": 0.0,
+    "recall": 0.0,
+    "f1": 0.0,
+    "auc": 0.45164521658063256,
+    "eer": 0.5339009702893436,
+    "apcer": 1.0,
+    "bpcer": 0.0,
+    "acer": 0.5,
+    "dataset": "mean",
+    "bonafide_mean": 0.0073454915545880795,
+    "morph_mean": 0.007343505509197712,
+    "bonafide_std": 0.0003827884793281555,
+    "morph_std": 0.00039374438347294927,
+    "bpcer_at_apcer_0.05": 0.8206801375312234,
+    "bpcer_at_apcer_0.10": 0.7868896531564193,
+    "bpcer_at_apcer_0.20": 0.7339927136241655,
+    "total_time": 189.85495471954346
+}

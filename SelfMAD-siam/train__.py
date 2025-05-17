@@ -19,6 +19,7 @@ from tqdm import tqdm
 from utils.model import Detector
 import json
 from utils.metrics import calculate_eer, calculate_auc
+from utils.loss import smooth_targets, get_loss_function
 from eval__ import default_datasets, prep_dataloaders, evaluate
 import sys
 sys.path.append('..')
@@ -508,9 +509,32 @@ def main(args):
     # Initialize logger
     logger = log(path=logs_path, file="losses.logs")
 
-    # Use BCE loss for binary classification
-    # Note: BCELoss doesn't support label_smoothing parameter
-    criterion=nn.BCELoss()
+    # Get loss function configuration
+    try:
+        from automation_config import get_config
+        cfg = get_config()
+        loss_type = cfg.get("siam_loss_type", "bce_smoothing")
+        label_smoothing = cfg.get("siam_vit_label_smoothing", 0.1)
+        focal_alpha = cfg.get("siam_focal_alpha", 0.25)
+        focal_gamma = cfg.get("siam_focal_gamma", 2.0)
+    except (ImportError, AttributeError):
+        # Default values if config is not available
+        loss_type = "bce_smoothing"
+        label_smoothing = 0.1
+        focal_alpha = 0.25
+        focal_gamma = 2.0
+
+    # Create loss function based on configuration
+    criterion = get_loss_function(
+        loss_type=loss_type,
+        label_smoothing=label_smoothing,
+        focal_alpha=focal_alpha,
+        focal_gamma=focal_gamma
+    )
+
+    # Log the loss function being used
+    logger.info(f"Using loss function: {loss_type} with parameters: label_smoothing={label_smoothing}, focal_alpha={focal_alpha}, focal_gamma={focal_gamma}")
+
     if args["saving_strategy"] == "original":
         last_val_auc=0
         weight_dict={}
@@ -617,9 +641,22 @@ def main(args):
                 # For binary classification with BCE loss, convert to float and reshape to match output
                 target_float = target.float().unsqueeze(1)  # Shape: [batch_size, 1]
 
+                # Apply label smoothing to targets
+                # Try to get label smoothing value from automation_config.py if it exists
+                try:
+                    from automation_config import get_config
+                    cfg = get_config()
+                    label_smoothing = cfg.get("siam_vit_label_smoothing", 0.1)
+                except (ImportError, AttributeError):
+                    # Default value if config is not available
+                    label_smoothing = 0.1
+
+                # Apply smoothing
+                target_smoothed = smooth_targets(target_float, label_smoothing)
+
                 # For ViT MAE, use gradient accumulation
                 output = model(img)  # Shape: [batch_size, 1]
-                loss = criterion(output, target_float) / accumulation_steps  # Scale loss
+                loss = criterion(output, target_smoothed) / accumulation_steps  # Scale loss
                 loss.backward()
 
                 # Add the full loss (not scaled) to train_loss for reporting
@@ -733,9 +770,22 @@ def main(args):
             # Convert target to float for BCE loss (expects float targets)
             target_float = target.float().unsqueeze(1)  # Shape: [batch_size, 1]
 
+            # Apply label smoothing to targets
+            # Try to get label smoothing value from automation_config.py if it exists
+            try:
+                from automation_config import get_config
+                cfg = get_config()
+                label_smoothing = cfg.get("siam_vit_label_smoothing", 0.1)
+            except (ImportError, AttributeError):
+                # Default value if config is not available
+                label_smoothing = 0.1
+
+            # Apply smoothing
+            target_smoothed = smooth_targets(target_float, label_smoothing)
+
             with torch.no_grad():
                 output=model(img)  # Shape: [batch_size, 1]
-                loss=criterion(output, target_float)
+                loss=criterion(output, target_smoothed)
                 val_loss += loss.item()
 
             # Process outputs based on model type
