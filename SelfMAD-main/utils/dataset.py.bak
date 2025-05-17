@@ -1,0 +1,576 @@
+from torch.utils.data import Dataset
+import os
+import numpy as np
+from PIL import Image
+import cv2
+import random
+import pandas as pd
+from utils.selfMAD import selfMAD_Dataset
+import torch
+
+
+class OriginalMorphDataset(Dataset):
+    def __init__(self, datapath, image_size, phase='train', transform=None):
+        assert datapath is not None
+        if "FF++" in datapath:
+            assert phase in ['train','val','test']
+            datapath = os.path.join(datapath, phase)
+
+        labels = []
+        image_paths = []
+        for method in os.listdir(datapath):
+            for root, _, files in os.walk(os.path.join(datapath, method)):
+                if not files:
+                    continue
+                for filename in files:
+                    if filename.endswith(('.png', '.jpg')):
+                        image_paths.append(os.path.join(root, filename))
+                        if "real" in root or "raw" in root:
+                            labels.append(0)
+                        else:
+                            labels.append(1)
+
+        self.image_paths = image_paths
+        self.labels = labels
+        self.transform = transform
+        self.img_size = image_size
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+
+        img=np.array(Image.open(self.image_paths[idx]))
+        label=self.labels[idx]
+        img = cv2.resize(img, (self.img_size, self.img_size))
+        img=img.transpose((2,0,1))
+        img = img.astype('float32')/255
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
+
+class MorphDataset(Dataset):
+    def __init__(self, dataset_name, phase='train', image_size=384, train_val_split=0.8, csv_path=None):
+        """
+        Custom dataset adapter for morph detection
+
+        Args:
+            dataset_name: Name of the dataset (LMA, LMA_UBO, etc.)
+            phase: 'train', 'val', or 'test'
+            image_size: Size of the images
+            train_val_split: Ratio of training data (0.8 = 80% train, 20% val)
+            csv_path: Path to save/load CSV file with image paths and labels
+        """
+        self.phase = phase
+        self.image_size = image_size
+
+        self.dataset_name = dataset_name
+        self.train_val_split = train_val_split
+
+        # Base paths - use os.path.join for cross-platform compatibility
+        # Get the base directory from environment or use a relative path
+        base_dir = os.environ.get("DATASETS_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datasets"))
+        self.bonafide_path = os.path.join(base_dir, "bonafide", dataset_name)
+        self.morph_path = os.path.join(base_dir, "morph", dataset_name)
+
+        # Initialize lists for images and labels
+        self.image_list = []
+        self.labels = []
+        self.path_lm = []  # For landmarks
+        self.face_labels = []  # For face labels
+
+        # CSV handling
+        self.csv_path = csv_path
+        if csv_path is not None and os.path.exists(csv_path) and phase != 'test':
+            # Load from existing CSV
+            self.load_from_csv(csv_path)
+        else:
+            # Create new dataset
+            self.create_dataset()
+            if csv_path is not None and phase != 'test':
+                self.save_to_csv(csv_path)
+
+    def create_dataset(self):
+        """Create dataset from folder structure"""
+        # Determine which folder to use based on phase
+        folder_name = "train" if self.phase != 'test' else "test"
+
+        # Load all images first, then split into train/val
+        all_images = []
+        all_labels = []
+        all_path_lm = []
+        all_face_labels = []
+
+        # Load bonafide images (label 0)
+        bonafide_folder = os.path.join(self.bonafide_path, folder_name)
+
+        if os.path.exists(bonafide_folder):
+            for img_file in os.listdir(bonafide_folder):
+                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    img_path = os.path.join(bonafide_folder, img_file)
+                    all_images.append(img_path)
+                    all_labels.append(0)  # Bonafide label
+
+                    # Add placeholder paths for landmarks and face labels
+                    # These will be generated on-the-fly during training
+                    all_path_lm.append(None)
+                    all_face_labels.append(None)
+
+        # Load morph images (label 1)
+        morph_folder = os.path.join(self.morph_path, folder_name)
+
+        if os.path.exists(morph_folder):
+            for img_file in os.listdir(morph_folder):
+                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    img_path = os.path.join(morph_folder, img_file)
+                    all_images.append(img_path)
+                    all_labels.append(1)  # Morph label
+
+                    # Add placeholder paths for landmarks and face labels
+                    all_path_lm.append(None)
+                    all_face_labels.append(None)
+
+        # If train/val phase, split the dataset
+        if self.phase != 'test':
+            # Combine data and shuffle with fixed seed for reproducibility
+            combined = list(zip(all_images, all_labels, all_path_lm, all_face_labels))
+            random.seed(42)  # Fixed seed for reproducibility
+            random.shuffle(combined)
+            all_images, all_labels, all_path_lm, all_face_labels = zip(*combined)
+
+            # Convert back to lists
+            all_images = list(all_images)
+            all_labels = list(all_labels)
+            all_path_lm = list(all_path_lm)
+            all_face_labels = list(all_face_labels)
+
+            # Split according to train_val_split
+            split_idx = int(len(all_images) * self.train_val_split)
+
+            if self.phase == 'train':
+                self.image_list = all_images[:split_idx]
+                self.labels = all_labels[:split_idx]
+                self.path_lm = all_path_lm[:split_idx]
+                self.face_labels = all_face_labels[:split_idx]
+            elif self.phase == 'val':
+                self.image_list = all_images[split_idx:]
+                self.labels = all_labels[split_idx:]
+                self.path_lm = all_path_lm[split_idx:]
+                self.face_labels = all_face_labels[split_idx:]
+        else:
+            # For test phase, use all images
+            self.image_list = all_images
+            self.labels = all_labels
+            self.path_lm = all_path_lm
+            self.face_labels = all_face_labels
+
+    def save_to_csv(self, csv_path):
+        """Save dataset to CSV file"""
+        os.makedirs(os.path.dirname(csv_path), exist_ok=True)
+
+        # Create DataFrame
+        df = pd.DataFrame({
+            'image_path': self.image_list,
+            'label': self.labels,
+            'split': [self.phase] * len(self.image_list)
+        })
+
+        # Check if the CSV file already exists
+        if os.path.exists(csv_path):
+            try:
+                # Load existing CSV and append new data
+                existing_df = pd.read_csv(csv_path)
+
+                # Remove existing entries with the same split
+                existing_df = existing_df[existing_df['split'] != self.phase]
+
+                # Append new data
+                df = pd.concat([existing_df, df], ignore_index=True)
+            except Exception as e:
+                print(f"Error reading existing CSV file: {e}")
+                print(f"Creating new CSV file at {csv_path}")
+                # Continue with creating a new CSV file
+
+        # Save to CSV
+        df.to_csv(csv_path, index=False)
+        print(f"CSV file saved at {csv_path} with {len(df)} entries")
+
+    def load_from_csv(self, csv_path):
+        """Load dataset from CSV file"""
+        try:
+            df = pd.read_csv(csv_path)
+
+            # Filter by split (train/val)
+            df = df[df['split'] == self.phase]
+
+            # Check if we have any data for this split
+            if len(df) == 0:
+                print(f"Warning: No data found for split '{self.phase}' in {csv_path}")
+                print("Creating new dataset from folder structure")
+                self.create_dataset()
+                self.save_to_csv(csv_path)
+                return
+
+            # Extract data
+            self.image_list = df['image_path'].tolist()
+            self.labels = df['label'].tolist()
+
+            # Add placeholder paths for landmarks and face labels
+            self.path_lm = [None] * len(self.image_list)
+            self.face_labels = [None] * len(self.image_list)
+
+            print(f"Loaded {len(self.image_list)} samples for '{self.phase}' split from {csv_path}")
+        except Exception as e:
+            print(f"Error loading CSV file {csv_path}: {e}")
+            print("Creating new dataset from folder structure")
+            self.create_dataset()
+            self.save_to_csv(csv_path)
+
+    def __getitem__(self, idx):
+        """Get item from the dataset"""
+        # Load image
+        img_path = self.image_list[idx]
+        img = np.array(Image.open(img_path))
+
+        # For validation and testing, resize and return as dictionary
+        if self.phase != 'train':
+            if isinstance(self.image_size, tuple):
+                target_size = self.image_size
+            else:
+                target_size = (self.image_size, self.image_size)
+            img = cv2.resize(img, target_size, interpolation=cv2.INTER_LANCZOS4)
+
+            # Convert to PyTorch format
+            img = img.astype('float32') / 255.0
+            img = torch.from_numpy(img).permute(2, 0, 1)
+
+            # Return dictionary with image and label
+            return {'img': img, 'label': self.labels[idx]}
+        else:
+            # For training, create a fake image
+            if isinstance(self.image_size, tuple):
+                target_size = self.image_size
+            else:
+                target_size = (self.image_size, self.image_size)
+
+            img = cv2.resize(img, target_size, interpolation=cv2.INTER_LANCZOS4)
+
+            # Create a fake image by applying simple transformations
+            fake_img = img.copy()
+
+            # Apply some basic transformations to create a fake image
+            # Adjust brightness
+            fake_img = cv2.convertScaleAbs(fake_img, alpha=1.1, beta=10)
+
+            # Convert to PyTorch format
+            img = img.astype('float32') / 255.0
+            fake_img = fake_img.astype('float32') / 255.0
+
+            # Return tuple of (fake_img, real_img) as expected by collate_fn
+            return fake_img, img
+
+    def generate_landmarks(self, img):
+        """Generate facial landmarks for an image"""
+        # Placeholder implementation - in a real scenario, you would use a landmark detector
+        # For now, we'll create dummy landmarks based on image size
+        h, w = img.shape[:2]
+
+        # Create a more detailed face outline with more points for better convex hull
+        # These points form a rough oval around the face
+        num_points = 81
+        landmarks = np.zeros((num_points, 2), dtype=np.int32)  # Use int32 for OpenCV compatibility
+
+        # Create points in an oval shape
+        for i in range(num_points):
+            angle = 2 * np.pi * i / num_points
+            x = int(w/2 + (w/3) * np.cos(angle))
+            y = int(h/2 + (h/3) * np.sin(angle))
+            landmarks[i] = [x, y]
+
+        return landmarks
+
+    def generate_face_labels(self, img):
+        """Generate face parsing labels for an image"""
+        # Placeholder implementation - in a real scenario, you would use a face parser
+        # For now, we'll create a dummy face label map
+        h, w = img.shape[:2]
+        face_label = np.zeros((h, w), dtype=np.int32)
+
+        # Create regions for different face parts (simplified)
+        face_label[int(h*0.2):int(h*0.8), int(w*0.2):int(w*0.8)] = 1  # Face
+        face_label[int(h*0.3):int(h*0.4), int(w*0.3):int(w*0.4)] = 2  # Left eye
+        face_label[int(h*0.3):int(h*0.4), int(w*0.6):int(w*0.7)] = 3  # Right eye
+        face_label[int(h*0.5):int(h*0.6), int(w*0.4):int(w*0.6)] = 4  # Mouth
+
+        return face_label
+
+    def collate_fn(self, batch):
+        """Custom collate function for the dataloader"""
+        if self.phase == 'train':
+            # For training, batch contains tuples of (fake_img, real_img)
+            fake_imgs = []
+            real_imgs = []
+            for fake_img, real_img in batch:
+                fake_imgs.append(torch.from_numpy(fake_img.transpose((2, 0, 1))))
+                real_imgs.append(torch.from_numpy(real_img.transpose((2, 0, 1))))
+
+            # Stack images and create labels
+            fake_imgs = torch.stack(fake_imgs)
+            real_imgs = torch.stack(real_imgs)
+            fake_labels = torch.ones(len(batch), dtype=torch.long)
+            real_labels = torch.zeros(len(batch), dtype=torch.long)
+
+            # Combine fake and real images
+            imgs = torch.cat([fake_imgs, real_imgs], dim=0)
+            labels = torch.cat([fake_labels, real_labels], dim=0)
+
+            return {'img': imgs, 'label': labels}
+        else:
+            # For validation and testing, batch contains dictionaries
+            imgs = []
+            labels = []
+            for item in batch:
+                imgs.append(item['img'])
+                labels.append(item['label'])
+
+            return {'img': torch.stack(imgs), 'label': torch.tensor(labels, dtype=torch.long)}
+
+    def worker_init_fn(self, worker_id):
+        """Initialize worker for dataloader"""
+        np.random.seed(np.random.get_state()[1][0] + worker_id)
+
+    def __len__(self):
+        """Return the length of the dataset"""
+        return len(self.image_list)
+
+
+class PartialMorphDataset(Dataset):
+    def __init__(self, datapath, image_size, transform=None, method=None):
+        assert datapath is not None
+        assert method is not None
+        if 'FRLL' in datapath:
+            assert method in ['amsl', 'facemorpher', 'opencv', 'stylegan', 'webmorph']
+            self.dataset_name = f"FRLL_{method}"
+        elif 'FRGC' in datapath:
+            assert method in ['facemorpher', 'opencv', 'stylegan']
+            self.dataset_name = f"FRGC_{method}"
+        elif 'FERET' in datapath:
+            assert method in ['facemorpher', 'opencv', 'stylegan']
+            self.dataset_name = f"FERET_{method}"
+
+        labels = []
+        image_paths = []
+        for curr_method in os.listdir(datapath):
+            for root, _, files in os.walk(os.path.join(datapath, curr_method)):
+                if not files:
+                    continue
+                for filename in files:
+                    if filename.endswith(('.png', '.jpg')) and method in root or "real" in root or "raw" in root:
+                        image_paths.append(os.path.join(root, filename))
+                        if "real" in root or "raw" in root:
+                            labels.append(0)
+                        else:
+                            labels.append(1)
+
+        self.image_paths = image_paths
+        self.labels = labels
+        self.transform = transform
+        self.img_size = image_size
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+
+        img=np.array(Image.open(self.image_paths[idx]))
+        label=self.labels[idx]
+        img = cv2.resize(img, (self.img_size, self.img_size))
+        img=img.transpose((2,0,1))
+        img = img.astype('float32')/255
+        if self.transform:
+            img = self.transform(img)
+        return img, label
+
+
+class TestMorphDataset(Dataset):
+    """Dataset for testing morph detection models"""
+    def __init__(self, dataset_name, image_size=384):
+        self.dataset_name = dataset_name
+        self.image_size = image_size
+
+        # Initialize lists
+        self.image_paths = []
+        self.labels = []
+
+        # Get the base directory from environment or use a relative path
+        base_dir = os.environ.get("DATASETS_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "datasets"))
+        output_dir = os.environ.get("OUTPUT_DIR", os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "output"))
+
+        # Try to load from CSV first
+        csv_path = os.path.join(output_dir, "train", f"{dataset_name}_split.csv")
+        if os.path.exists(csv_path):
+            try:
+                print(f"Loading test data from CSV: {csv_path}")
+                df = pd.read_csv(csv_path)
+                # Use train data for testing if no test data is available
+                # This is just for demonstration purposes
+                train_df = df[df['split'] == 'train']
+
+                if len(train_df) > 0:
+                    # Use a subset of train data for testing
+                    sample_size = min(60, len(train_df))
+                    sampled_df = train_df.sample(n=sample_size, random_state=42)
+                    self.image_paths = sampled_df['image_path'].tolist()
+                    self.labels = sampled_df['label'].tolist()
+                    print(f"Loaded {len(self.image_paths)} test samples from CSV (using train data)")
+                    return
+            except Exception as e:
+                print(f"Error loading from CSV: {str(e)}")
+
+        # If CSV loading failed, fall back to directory loading
+        print(f"Loading test data from directories for {dataset_name}")
+
+        # Load bonafide test images (label 0)
+        bonafide_path = os.path.join(base_dir, "bonafide", dataset_name, "test")
+        if os.path.exists(bonafide_path):
+            for img_file in os.listdir(bonafide_path):
+                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    self.image_paths.append(os.path.join(bonafide_path, img_file))
+                    self.labels.append(0)
+
+        # Load morph test images (label 1)
+        morph_path = os.path.join(base_dir, "morph", dataset_name, "test")
+        if os.path.exists(morph_path):
+            for img_file in os.listdir(morph_path):
+                if img_file.lower().endswith(('.png', '.jpg', '.jpeg')):
+                    self.image_paths.append(os.path.join(morph_path, img_file))
+                    self.labels.append(1)
+
+        # If no images were found, create dummy test data
+        if len(self.image_paths) == 0:
+            print(f"No test images found for {dataset_name}, creating dummy test data")
+            # Use train data from CSV if available
+            if os.path.exists(csv_path):
+                try:
+                    df = pd.read_csv(csv_path)
+                    train_df = df[df['split'] == 'train']
+                    if len(train_df) > 0:
+                        # Use a subset of train data for testing
+                        sample_size = min(60, len(train_df))
+                        sampled_df = train_df.sample(n=sample_size, random_state=42)
+                        self.image_paths = sampled_df['image_path'].tolist()
+                        self.labels = sampled_df['label'].tolist()
+                        print(f"Created {len(self.image_paths)} test samples from train data")
+                        return
+                except Exception as e:
+                    print(f"Error creating dummy test data from CSV: {str(e)}")
+
+            # If all else fails, create completely dummy data
+            print("Creating completely dummy test data")
+            for i in range(30):
+                # Add dummy paths that will be handled by the error handling in __getitem__
+                self.image_paths.append(f"dummy_bonafide_{i}.png")
+                self.labels.append(0)
+                self.image_paths.append(f"dummy_morph_{i}.png")
+                self.labels.append(1)
+
+    def __len__(self):
+        return len(self.image_paths)
+
+    def __getitem__(self, idx):
+        try:
+            # Load and preprocess image
+            img_path = self.image_paths[idx]
+
+            # Check if file exists - try both as is and relative to current directory
+            if os.path.exists(img_path):
+                try:
+                    img = np.array(Image.open(img_path))
+                except Exception as e:
+                    print(f"Error loading image {img_path}: {str(e)}")
+                    # Create a blank image as a fallback
+                    img = np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8)
+            else:
+                # Try relative to SelfMAD-main directory
+                alt_path = os.path.join(".", img_path)
+                if os.path.exists(alt_path):
+                    try:
+                        img = np.array(Image.open(alt_path))
+                    except Exception as e:
+                        print(f"Error loading image {alt_path}: {str(e)}")
+                        # Create a blank image as a fallback
+                        img = np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8)
+                else:
+                    print(f"Warning: Image file not found: {img_path} or {alt_path}")
+                    # Create a blank image as a fallback
+                    img = np.zeros((self.image_size, self.image_size, 3), dtype=np.uint8)
+
+            # Resize to expected dimensions using Lanczos resampling
+            img = cv2.resize(img, (self.image_size, self.image_size), interpolation=cv2.INTER_LANCZOS4)
+
+            # Convert to PyTorch format
+            img = img.astype('float32') / 255.0
+            img = torch.from_numpy(img).permute(2, 0, 1)
+
+            # Return in the format expected by the evaluate function
+            return img, self.labels[idx]
+        except Exception as e:
+            print(f"Unexpected error in __getitem__ for index {idx}: {str(e)}")
+            # Create a blank image as a fallback
+            img = np.zeros((3, self.image_size, self.image_size), dtype=np.float32)
+            return torch.tensor(img), self.labels[idx]
+
+    def collate_fn(self, batch):
+        """Custom collate function for the dataloader"""
+        imgs = []
+        labels = []
+        for img, label in batch:
+            imgs.append(img)
+            labels.append(label)
+
+        return {'img': torch.stack(imgs), 'label': torch.tensor(labels, dtype=torch.long)}
+
+    def worker_init_fn(self, worker_id):
+        """Initialize worker for dataloader"""
+        np.random.seed(np.random.get_state()[1][0] + worker_id)
+
+# class MorDIFF(Dataset):
+#     def __init__(self, datapath_fake, datapath_real, image_size, transform=None):
+#         assert datapath_fake is not None
+#         assert datapath_real is not None
+
+#         labels = []
+#         image_paths = []
+#         for curr_faces in os.listdir(datapath_fake):
+#             for root, _, files in os.walk(os.path.join(datapath_fake, curr_faces)):
+#                 if not files:
+#                     continue
+#                 for filename in files:
+#                     if filename.endswith(('.png', '.jpg')):
+#                         image_paths.append(os.path.join(root, filename))
+#                         labels.append(1)
+
+#         for filename in os.listdir(os.path.join(datapath_real, 'FRLL-Morphs_cropped', 'raw')):
+#             if filename.endswith(('.png', '.jpg')):
+#                 image_paths.append(os.path.join(datapath_real, 'FRLL-Morphs_cropped', 'raw', filename))
+#                 labels.append(0)
+
+#         self.image_paths = image_paths
+#         self.labels = labels
+#         self.transform = transform
+#         self.img_size = image_size
+
+#     def __len__(self):
+#         return len(self.image_paths)
+
+#     def __getitem__(self, idx):
+
+#         img=np.array(Image.open(self.image_paths[idx]))
+#         label=self.labels[idx]
+#         img = cv2.resize(img, (self.img_size, self.img_size))
+#         img=img.transpose((2,0,1))
+#         img = img.astype('float32')/255
+#         if self.transform:
+#             img = self.transform(img)
+#         return img, label

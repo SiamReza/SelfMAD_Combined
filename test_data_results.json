@@ -1,0 +1,20 @@
+{
+    "MorDiff": {
+        "total_samples": 3361,
+        "bonafide_samples": 596,
+        "morph_samples": 2765,
+        "has_nan": false,
+        "has_inf": false,
+        "min_val": 0.0,
+        "max_val": 1.0
+    },
+    "StyleGAN": {
+        "total_samples": 1894,
+        "bonafide_samples": 583,
+        "morph_samples": 1311,
+        "has_nan": false,
+        "has_inf": false,
+        "min_val": 0.0,
+        "max_val": 1.0
+    }
+}

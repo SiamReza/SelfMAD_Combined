@@ -1,0 +1,58 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Jupyter Notebook
+.ipynb_checkpoints
+
+# Environment
+.env
+.venv
+env/
+venv/
+ENV/
+
+# Dataset images - exclude all images but keep folder structure
+datasets/**/*.jpg
+datasets/**/*.jpeg
+datasets/**/*.png
+datasets/**/*.bmp
+datasets/**/*.tif
+datasets/**/*.tiff
+datasets/**/*.gif
+datasets/**/*.npy
+datasets/**/*.npz
+SelfMAD-siam/datasets/**/*.jpg
+SelfMAD-siam/datasets/**/*.jpeg
+SelfMAD-siam/datasets/**/*.png
+SelfMAD-siam/datasets/**/*.bmp
+SelfMAD-siam/datasets/**/*.tif
+SelfMAD-siam/datasets/**/*.tiff
+SelfMAD-siam/datasets/**/*.gif
+SelfMAD-siam/datasets/**/*.npy
+SelfMAD-siam/datasets/**/*.npz
+
+# Model weights
+*.pth
+*.pt
+*.h5
+*.hdf5
+*.ckpt
+*.pb
+*.onnx
+*.weights
+*.tar
+
+# Logs
+logs/
+*.log
+
+# OS specific
+.DS_Store
+Thumbs.db

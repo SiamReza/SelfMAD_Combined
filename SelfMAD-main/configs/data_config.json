@@ -1,0 +1,8 @@
+{
+    "LMA_path": "../datasets",
+    "LMA_UBO_path": "../datasets",
+    "MIPGAN_I_path": "../datasets",
+    "MIPGAN_II_path": "../datasets",
+    "MorDiff_path": "../datasets",
+    "StyleGAN_path": "../datasets"
+}
