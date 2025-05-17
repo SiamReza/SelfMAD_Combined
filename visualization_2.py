@@ -39,7 +39,7 @@ def plot_det_curve(targets, outputs, output_dir=None, model_name=None, dataset_n
 
     # Calculate ROC curve
     fpr, tpr, _ = roc_curve(targets, outputs)
-    
+
     # Calculate DET curve (FRR vs. FAR)
     frr = 1 - tpr  # False Rejection Rate = 1 - True Positive Rate
     far = fpr      # False Acceptance Rate = False Positive Rate
@@ -109,18 +109,18 @@ def plot_score_distributions(bonafide_scores, morph_scores, output_dir=None, mod
 
     # Plot score distributions
     plt.figure(figsize=(12, 8))
-    
+
     # Plot histograms
     bins = np.linspace(0, 1, 50)
     plt.hist(bonafide_scores, bins=bins, alpha=0.5, label=f'Bonafide (n={len(bonafide_scores)})', color='green')
     plt.hist(morph_scores, bins=bins, alpha=0.5, label=f'Morph (n={len(morph_scores)})', color='red')
-    
+
     # Add vertical line at threshold 0.5
     plt.axvline(x=0.5, color='black', linestyle='--', label='Threshold = 0.5')
-    
+
     plt.xlabel('Score')
     plt.ylabel('Count')
-    
+
     # Generate plot title
     if model_dataset and model_type and eval_dataset:
         title = f"Score Distributions - {model_type} trained on {model_dataset}"
@@ -188,7 +188,7 @@ def plot_score_boxplots(class_separated_dict, output_dir=None, model_name=None,
     plt.boxplot(bonafide_data, labels=dataset_names)
     plt.xlabel('Dataset')
     plt.ylabel('Score')
-    
+
     # Generate plot title
     if model_dataset and model_type:
         title = f"Bonafide Score Distributions - {model_type} trained on {model_dataset}"
@@ -218,7 +218,7 @@ def plot_score_boxplots(class_separated_dict, output_dir=None, model_name=None,
     plt.boxplot(morph_data, labels=dataset_names)
     plt.xlabel('Dataset')
     plt.ylabel('Score')
-    
+
     # Generate plot title
     if model_dataset and model_type:
         title = f"Morph Score Distributions - {model_type} trained on {model_dataset}"
@@ -270,21 +270,21 @@ def plot_threshold_analysis(targets, outputs, output_dir=None, model_name=None, 
     precisions = []
     recalls = []
     f1_scores = []
-    
+
     for threshold in thresholds:
         preds = (np.array(outputs) > threshold).astype(int)
-        
+
         # Calculate metrics
         tp = np.sum((preds == 1) & (targets == 1))
         tn = np.sum((preds == 0) & (targets == 0))
         fp = np.sum((preds == 1) & (targets == 0))
         fn = np.sum((preds == 0) & (targets == 1))
-        
+
         accuracy = (tp + tn) / (tp + tn + fp + fn) if (tp + tn + fp + fn) > 0 else 0
         precision = tp / (tp + fp) if (tp + fp) > 0 else 0
         recall = tp / (tp + fn) if (tp + fn) > 0 else 0
         f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
-        
+
         accuracies.append(accuracy)
         precisions.append(precision)
         recalls.append(recall)
@@ -296,13 +296,13 @@ def plot_threshold_analysis(targets, outputs, output_dir=None, model_name=None, 
     plt.plot(thresholds, precisions, label='Precision')
     plt.plot(thresholds, recalls, label='Recall')
     plt.plot(thresholds, f1_scores, label='F1 Score')
-    
+
     # Add vertical line at threshold 0.5
     plt.axvline(x=0.5, color='black', linestyle='--', label='Threshold = 0.5')
-    
+
     plt.xlabel('Threshold')
     plt.ylabel('Metric Value')
-    
+
     # Generate plot title
     if model_dataset and model_type and eval_dataset:
         title = f"Threshold Analysis - {model_type} trained on {model_dataset}"
@@ -353,25 +353,25 @@ def plot_combined_roc_curves(targets_outputs_dict, output_dir=None, model_name=N
 
     # Plot ROC curves
     plt.figure(figsize=(12, 10))
-    
+
     # Use different colors for each dataset
     colors = list(mcolors.TABLEAU_COLORS)
     color_cycle = cycle(colors)
-    
+
     for dataset_name, (targets, outputs) in targets_outputs_dict.items():
         # Calculate ROC curve and ROC area
         fpr, tpr, _ = roc_curve(targets, outputs)
         roc_auc = auc(fpr, tpr)
-        
+
         # Plot ROC curve
         plt.plot(fpr, tpr, lw=2, color=next(color_cycle), label=f'{dataset_name} (AUC = {roc_auc:.3f})')
-    
+
     plt.plot([0, 1], [0, 1], 'k--', lw=2)
     plt.xlim([0.0, 1.0])
     plt.ylim([0.0, 1.05])
     plt.xlabel('False Positive Rate')
     plt.ylabel('True Positive Rate')
-    
+
     # Generate plot title
     if model_dataset and model_type:
         title = f"ROC Curves - {model_type} trained on {model_dataset}"
@@ -394,5 +394,88 @@ def plot_combined_roc_curves(targets_outputs_dict, output_dir=None, model_name=N
             model_name=model_name
         )
         plt.savefig(os.path.join(plots_dir, filename))
+
+    plt.close()
+
+def plot_combined_det_curves(targets_outputs_dict, output_dir=None, model_name=None,
+                           model_dataset=None, model_type=None, epoch_number=None):
+    """
+    Plot Detection Error Tradeoff (DET) curves for all datasets on a single plot.
+
+    Args:
+        targets_outputs_dict: Dictionary mapping dataset names to (targets, outputs) tuples
+        output_dir: Directory to save plots
+        model_name: Name of the model (used for saving plots)
+        model_dataset: Dataset the model was trained on
+        model_type: Model architecture type
+        epoch_number: Epoch number or checkpoint
+    """
+    # Create output directory if it doesn't exist
+    if output_dir:
+        plots_dir = os.path.join(output_dir, "plots")
+        os.makedirs(plots_dir, exist_ok=True)
+
+    # Plot DET curves
+    plt.figure(figsize=(12, 10))
+
+    # Set up colors and line styles for better differentiation
+    colors = list(mcolors.TABLEAU_COLORS)
+    line_styles = ['-', '--', '-.', ':']
+    style_cycle = cycle([(color, style) for color in colors for style in line_styles])
+
+    for dataset_name, (targets, outputs) in targets_outputs_dict.items():
+        # Get next color and line style
+        color, style = next(style_cycle)
+
+        # Calculate ROC curve (used for DET curve)
+        fpr, tpr, _ = roc_curve(targets, outputs)
+
+        # Calculate DET curve (FRR vs. FAR)
+        frr = 1 - tpr  # False Rejection Rate = 1 - True Positive Rate
+        far = fpr      # False Acceptance Rate = False Positive Rate
+
+        # Find the Equal Error Rate (EER)
+        eer_idx = np.argmin(np.abs(frr - far))
+        eer = (frr[eer_idx] + far[eer_idx]) / 2
+
+        # Plot DET curve
+        plt.plot(far, frr, color=color, linestyle=style, lw=2,
+                 label=f'{dataset_name} (EER = {eer:.3f})')
+
+    # Add reference line
+    plt.plot([0, 1], [0, 1], 'k--', lw=2)
+
+    # Use logarithmic scale for better visualization of low error rates
+    plt.xscale('log')
+    plt.yscale('log')
+    plt.xlim([1e-3, 1.0])
+    plt.ylim([1e-3, 1.0])
+
+    plt.xlabel('False Acceptance Rate (FAR)')
+    plt.ylabel('False Rejection Rate (FRR)')
+
+    # Generate plot title
+    if model_dataset and model_type:
+        title = f"Detection Error Tradeoff (DET) Curves - {model_type} trained on {model_dataset}"
+        if epoch_number is not None:
+            title += f" (Epoch {epoch_number})"
+    else:
+        title = "Detection Error Tradeoff (DET) Curves Comparison"
+
+    plt.title(title)
+    plt.legend(loc="lower left")
+    plt.grid(True, which="both", ls="-")
+
+    # Save plot with consistent naming scheme
+    if output_dir:
+        filename = generate_plot_filename(
+            plot_type="combined_det_curves",
+            model_dataset=model_dataset,
+            model_type=model_type,
+            epoch_number=epoch_number,
+            model_name=model_name
+        )
+        plt.savefig(os.path.join(plots_dir, filename))
+        print(f"Combined DET curves saved to {os.path.join(plots_dir, filename)}")
 
     plt.close()

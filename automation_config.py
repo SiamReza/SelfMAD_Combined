@@ -17,7 +17,7 @@ DATASETS = ["LMA", "LMA_MIPGAN_I", "MIPGAN_I"]  # Options: "LMA", "LMA_UBO", "MI
 ENABLE_COMBINED_DATASET = False # DO NOT USE TRUE THAT GIVES ERROR
 
 # Which models to run
-RUN_MODELS = "both"  # Options: "siam", "main", "both"
+RUN_MODELS = "main"  # Options: "siam", "main", "both"
 
 # Whether to run all models defined in MAIN_MODELS
 # Set to True to run all models, False to run only the model specified in MAIN_MODEL

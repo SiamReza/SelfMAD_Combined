@@ -1,1 +1,0 @@
-{'session_name': 'hrnet_w18', 'train_dataset': 'LMA_MIPGAN_I', 'model': 'hrnet_w18', 'epochs': 100, 'batch_size': 32, 'learning_rate': 0.0005, 'image_size': 384, 'saving_strategy': 'testset_best'}

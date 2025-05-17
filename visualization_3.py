@@ -38,7 +38,8 @@ from visualization_2 import (
     plot_score_distributions,
     plot_score_boxplots,
     plot_threshold_analysis,
-    plot_combined_roc_curves
+    plot_combined_roc_curves,
+    plot_combined_det_curves
 )
 from evaluation_1 import calculate_eer
 
@@ -315,6 +316,10 @@ def visualize_evaluation_results(results, targets_outputs_dict, class_separated_
     if len(targets_outputs_dict) > 1:
         # Plot combined ROC curves
         plot_combined_roc_curves(targets_outputs_dict, output_dir, model_name,
+                               model_dataset, model_type, epoch_number)
+
+        # Plot combined DET curves
+        plot_combined_det_curves(targets_outputs_dict, output_dir, model_name,
                                model_dataset, model_type, epoch_number)
 
         # Plot dataset comparison
