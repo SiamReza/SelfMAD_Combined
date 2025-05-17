@@ -306,8 +306,8 @@ def default_datasets(image_size, datasets="original", config=None):
         }
         return test_datasets
     elif datasets == "custom_morph":
-        # Custom morph datasets (LMA, LMA_UBO, MIPGAN_I, MIPGAN_II, MorDiff, StyleGAN)
-        custom_morph_datasets = ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"]
+        # Custom morph datasets (LMA, LMA_UBO, MIPGAN_I, MIPGAN_II, MorDiff, StyleGAN, LMA_MIPGAN_I)
+        custom_morph_datasets = ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"]
         test_datasets = {}
 
         for dataset_name in custom_morph_datasets:
@@ -422,6 +422,7 @@ if __name__ == "__main__":
     parser.add_argument('-MIPGAN_II_path', type=str, required=False)
     parser.add_argument('-MorDiff_path', type=str, required=False)
     parser.add_argument('-StyleGAN_path', type=str, required=False)
+    parser.add_argument('-LMA_MIPGAN_I_path', type=str, required=False)
     args = parser.parse_args()
 
     # Get the directory where the script is located

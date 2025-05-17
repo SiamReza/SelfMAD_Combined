@@ -4,5 +4,6 @@
     "MIPGAN_I_path": "../datasets",
     "MIPGAN_II_path": "../datasets",
     "MorDiff_path": "../datasets",
-    "StyleGAN_path": "../datasets"
+    "StyleGAN_path": "../datasets",
+    "LMA_MIPGAN_I_path": "../datasets"
 }

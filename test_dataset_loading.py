@@ -29,20 +29,20 @@ def parse_args():
 def main():
     """Main function."""
     args = parse_args()
-    
+
     # Try to load configuration from automation_config.py
     try:
         sys.path.append(os.path.dirname(os.path.abspath(__file__)))
         from automation_config import get_config
         config = get_config()
         print("Loaded configuration from automation_config.py")
-        
+
         # Print dataset paths
         print(f"Dataset paths from automation_config.py: {config['dataset_paths']}")
-        
+
         # Test dataset loading using the paths from automation_config.py
         print(f"\nTesting dataset loading for {args.dataset} using paths from automation_config.py...")
-        
+
         # Create config for custom morph datasets
         morph_config = {
             "LMA_path": config["dataset_paths"]["LMA_path"],
@@ -50,29 +50,30 @@ def main():
             "MIPGAN_I_path": config["dataset_paths"]["MIPGAN_I_path"],
             "MIPGAN_II_path": config["dataset_paths"]["MIPGAN_II_path"],
             "MorDiff_path": config["dataset_paths"]["MorDiff_path"],
-            "StyleGAN_path": config["dataset_paths"]["StyleGAN_path"]
+            "StyleGAN_path": config["dataset_paths"]["StyleGAN_path"],
+            "LMA_MIPGAN_I_path": config["dataset_paths"]["LMA_MIPGAN_I_path"]
         }
-        
+
         # Load custom morph test datasets
         custom_test_datasets = default_datasets(args.image_size, datasets="custom_morph", config=morph_config)
-        
+
         # Check if datasets were loaded successfully
         if custom_test_datasets:
             print(f"Successfully loaded custom test datasets: {list(custom_test_datasets.keys())}")
-            
+
             # Print details about each dataset
             for dataset_name, dataset_dict in custom_test_datasets.items():
                 for split_name, dataset in dataset_dict.items():
                     print(f"  - {dataset_name} ({split_name}): {len(dataset)} samples")
         else:
             print("No custom test datasets were loaded.")
-        
+
     except (ImportError, AttributeError) as e:
         print(f"Error loading configuration from automation_config.py: {e}")
-        
+
         # Try with default paths
         print("\nTrying with default paths...")
-        
+
         # Try multiple possible locations for datasets
         possible_base_dirs = [
             os.environ.get("DATASETS_DIR"),  # First check environment variable
@@ -81,17 +82,17 @@ def main():
             os.path.join("..", "datasets"),  # Check one level up
             os.path.abspath("datasets")  # Check absolute path
         ]
-        
+
         # Find the first valid directory
         datasets_dir = None
         for base_dir in possible_base_dirs:
             if base_dir and os.path.exists(base_dir):
                 datasets_dir = base_dir
                 break
-        
+
         if datasets_dir:
             print(f"Using datasets directory: {datasets_dir}")
-            
+
             # Create config for custom morph datasets
             morph_config = {
                 "LMA_path": datasets_dir,
@@ -99,16 +100,17 @@ def main():
                 "MIPGAN_I_path": datasets_dir,
                 "MIPGAN_II_path": datasets_dir,
                 "MorDiff_path": datasets_dir,
-                "StyleGAN_path": datasets_dir
+                "StyleGAN_path": datasets_dir,
+                "LMA_MIPGAN_I_path": datasets_dir
             }
-            
+
             # Load custom morph test datasets
             custom_test_datasets = default_datasets(args.image_size, datasets="custom_morph", config=morph_config)
-            
+
             # Check if datasets were loaded successfully
             if custom_test_datasets:
                 print(f"Successfully loaded custom test datasets: {list(custom_test_datasets.keys())}")
-                
+
                 # Print details about each dataset
                 for dataset_name, dataset_dict in custom_test_datasets.items():
                     for split_name, dataset in dataset_dict.items():

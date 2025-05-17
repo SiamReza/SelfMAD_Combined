@@ -11,12 +11,13 @@ class Config:
             "MIPGAN_I": os.path.join("..", "datasets"),
             "MIPGAN_II": os.path.join("..", "datasets"),
             "MorDiff": os.path.join("..", "datasets"),
-            "StyleGAN": os.path.join("..", "datasets")
+            "StyleGAN": os.path.join("..", "datasets"),
+            "LMA_MIPGAN_I": os.path.join("..", "datasets")
         }
 
         # Training configuration
         self.train_dataset = "LMA"  # Default dataset for training
-        self.test_datasets = ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"]
+        self.test_datasets = ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"]
         self.train_val_split = 0.8  # 80% training, 20% validation
 
         # Model configuration

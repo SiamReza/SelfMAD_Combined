@@ -9,7 +9,7 @@ import json
 import time
 import re
 from utils.selfMAD import selfMAD_Dataset
-from utils.custom_dataset import MorphDataset
+from utils.custom_dataset import MorphDataset, CombinedMorphDataset
 from utils.scheduler import LinearDecayLR, CosineAnnealingLR
 from torch.optim.lr_scheduler import LinearLR, SequentialLR
 import argparse
@@ -82,7 +82,7 @@ def get_next_serial_number(base_dir, prefix):
 def main(args):
 
     assert args["model"] in ["efficientnet-b4", "efficientnet-b7", "swin", "resnet", "hrnet_w18", "hrnet_w32", "hrnet_w44", "hrnet_w64", "vit_mae_large"]
-    assert args["train_dataset"] in ["FF++", "SMDD", "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"]
+    assert args["train_dataset"] in ["FF++", "SMDD", "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"]
     assert args["saving_strategy"] in ["original", "testset_best"]
 
     # Create centralized output directory structure
@@ -180,7 +180,7 @@ def main(args):
     batch_size=cfg['batch_size']
 
     # Check if using custom morph dataset
-    if args["train_dataset"] in ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"]:
+    if args["train_dataset"] in ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"]:
         # Create directory for CSV files if it doesn't exist
         # Always use the root output directory for CSV files
         parent_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -244,28 +244,63 @@ def main(args):
             recreate_csv = True
             print(f"Creating new dataset split for {args['train_dataset']}")
 
+        # Try to get configuration from automation_config.py if it exists
+        try:
+            import sys
+            sys.path.append('..')
+            from automation_config import get_config
+            config = get_config()
+            enable_combined_dataset = config.get("enable_combined_dataset", False)
+            datasets = config.get("datasets", [args["train_dataset"]])
+        except (ImportError, AttributeError):
+            # Default values if config is not available
+            enable_combined_dataset = False
+            datasets = [args["train_dataset"]]
+
         # Check if we need to create a new dataset split
         if recreate_csv:
-            # Create a temporary dataset to generate the train/val split
-            temp_dataset = MorphDataset(
-                dataset_name=args["train_dataset"],
-                phase='train',  # Doesn't matter for split creation
-                image_size=image_size,
-                train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
-                csv_path=None  # Don't load from CSV
-            )
+            if enable_combined_dataset and len(datasets) > 1:
+                # Create a temporary combined dataset to generate the train/val split
+                temp_dataset = CombinedMorphDataset(
+                    dataset_names=datasets,
+                    phase='train',  # Doesn't matter for split creation
+                    image_size=image_size,
+                    train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                    csv_path=None  # Don't load from CSV
+                )
 
-            # Save the split to CSV
-            temp_dataset.save_to_csv(csv_path)
+                # Save the split to CSV
+                temp_dataset.save_to_csv(csv_path)
 
-            # Now create the val dataset and save it to the same CSV
-            temp_val_dataset = MorphDataset(
-                dataset_name=args["train_dataset"],
-                phase='val',
-                image_size=image_size,
-                train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
-                csv_path=None  # Don't load from CSV
-            )
+                # Now create the val dataset and save it to the same CSV
+                temp_val_dataset = CombinedMorphDataset(
+                    dataset_names=datasets,
+                    phase='val',
+                    image_size=image_size,
+                    train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                    csv_path=None  # Don't load from CSV
+                )
+            else:
+                # Create a temporary dataset to generate the train/val split
+                temp_dataset = MorphDataset(
+                    dataset_name=args["train_dataset"],
+                    phase='train',  # Doesn't matter for split creation
+                    image_size=image_size,
+                    train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                    csv_path=None  # Don't load from CSV
+                )
+
+                # Save the split to CSV
+                temp_dataset.save_to_csv(csv_path)
+
+                # Now create the val dataset and save it to the same CSV
+                temp_val_dataset = MorphDataset(
+                    dataset_name=args["train_dataset"],
+                    phase='val',
+                    image_size=image_size,
+                    train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                    csv_path=None  # Don't load from CSV
+                )
 
             # Save the val split to the same CSV
             temp_val_dataset.save_to_csv(csv_path)
@@ -273,21 +308,39 @@ def main(args):
             print(f"Dataset split created and saved to {csv_path}")
 
         # Create custom datasets for training and validation from the CSV
-        train_dataset = MorphDataset(
-            dataset_name=args["train_dataset"],
-            phase='train',
-            image_size=image_size,
-            train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
-            csv_path=csv_path
-        )
+        if enable_combined_dataset and len(datasets) > 1:
+            print(f"Using combined dataset with datasets: {datasets}")
+            train_dataset = CombinedMorphDataset(
+                dataset_names=datasets,
+                phase='train',
+                image_size=image_size,
+                train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                csv_path=csv_path
+            )
 
-        val_dataset = MorphDataset(
-            dataset_name=args["train_dataset"],
-            phase='val',
-            image_size=image_size,
-            train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
-            csv_path=csv_path
-        )
+            val_dataset = CombinedMorphDataset(
+                dataset_names=datasets,
+                phase='val',
+                image_size=image_size,
+                train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                csv_path=csv_path
+            )
+        else:
+            train_dataset = MorphDataset(
+                dataset_name=args["train_dataset"],
+                phase='train',
+                image_size=image_size,
+                train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                csv_path=csv_path
+            )
+
+            val_dataset = MorphDataset(
+                dataset_name=args["train_dataset"],
+                phase='val',
+                image_size=image_size,
+                train_val_split=args["train_val_split"] if "train_val_split" in args else 0.8,
+                csv_path=csv_path
+            )
     else:
         # Use original SelfMAD dataset loading
         train_datapath = args["SMDD_path"] if args["train_dataset"] == "SMDD" else args["FF_path"]
@@ -352,7 +405,8 @@ def main(args):
             "MIPGAN_I_path": args.get("MIPGAN_I_path", datasets_dir),
             "MIPGAN_II_path": args.get("MIPGAN_II_path", datasets_dir),
             "MorDiff_path": args.get("MorDiff_path", datasets_dir),
-            "StyleGAN_path": args.get("StyleGAN_path", datasets_dir)
+            "StyleGAN_path": args.get("StyleGAN_path", datasets_dir),
+            "LMA_MIPGAN_I_path": args.get("LMA_MIPGAN_I_path", datasets_dir)
         }
 
         # Load custom morph test datasets

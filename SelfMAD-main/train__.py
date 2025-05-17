@@ -9,7 +9,7 @@ import json
 import time
 import re
 from utils.selfMAD import selfMAD_Dataset
-from utils.dataset import MorphDataset, TestMorphDataset
+from utils.dataset import MorphDataset, TestMorphDataset, CombinedMorphDataset
 from utils.scheduler import LinearDecayLR
 import argparse
 from utils.logs import log
@@ -81,7 +81,7 @@ def get_next_serial_number(base_dir, prefix):
 def main(args):
 
     assert args["model"] in ["efficientnet-b4", "efficientnet-b7", "swin", "resnet", "hrnet_w18", "hrnet_w32", "hrnet_w44", "hrnet_w64"]
-    assert args["train_dataset"] in ["FF++", "SMDD", "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"]
+    assert args["train_dataset"] in ["FF++", "SMDD", "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"]
     assert args["saving_strategy"] in ["original", "testset_best"]
 
     # Create centralized output directory structure
@@ -184,7 +184,7 @@ def main(args):
     batch_size=cfg['batch_size']
 
     # Check if using original datasets or custom morph datasets
-    custom_morph_datasets = ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"]
+    custom_morph_datasets = ["LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"]
 
     if args["train_dataset"] in custom_morph_datasets:
         # Use custom morph dataset
@@ -244,28 +244,65 @@ def main(args):
                 except:
                     pass
 
-        # Create train dataset
-        train_dataset = MorphDataset(
-            dataset_name=dataset_name,
-            phase='train',
-            image_size=image_size,
-            train_val_split=args.get("train_val_split", 0.8),
-            csv_path=csv_path
-        )
+        # Try to get configuration from automation_config.py if it exists
+        try:
+            import sys
+            sys.path.append('..')
+            from automation_config import get_config
+            config = get_config()
+            enable_combined_dataset = config.get("enable_combined_dataset", False)
+            datasets = config.get("datasets", [dataset_name])
+        except (ImportError, AttributeError):
+            # Default values if config is not available
+            enable_combined_dataset = False
+            datasets = [dataset_name]
 
-        # Create validation dataset
-        if args["saving_strategy"] == "original":
-            # For original strategy, use FF++ as validation
-            val_dataset = selfMAD_Dataset(phase='val', image_size=image_size, datapath=args["FF_path"])
-        else:
-            # For testset_best strategy, use custom morph validation set
-            val_dataset = MorphDataset(
-                dataset_name=dataset_name,
-                phase='val',
+        # Create train dataset
+        if enable_combined_dataset and len(datasets) > 1:
+            print(f"Using combined dataset with datasets: {datasets}")
+            train_dataset = CombinedMorphDataset(
+                dataset_names=datasets,
+                phase='train',
                 image_size=image_size,
                 train_val_split=args.get("train_val_split", 0.8),
                 csv_path=csv_path
             )
+
+            # Create validation dataset
+            if args["saving_strategy"] == "original":
+                # For original strategy, use FF++ as validation
+                val_dataset = selfMAD_Dataset(phase='val', image_size=image_size, datapath=args["FF_path"])
+            else:
+                # For testset_best strategy, use combined morph validation set
+                val_dataset = CombinedMorphDataset(
+                    dataset_names=datasets,
+                    phase='val',
+                    image_size=image_size,
+                    train_val_split=args.get("train_val_split", 0.8),
+                    csv_path=csv_path
+                )
+        else:
+            train_dataset = MorphDataset(
+                dataset_name=dataset_name,
+                phase='train',
+                image_size=image_size,
+                train_val_split=args.get("train_val_split", 0.8),
+                csv_path=csv_path
+            )
+
+            # Create validation dataset
+            if args["saving_strategy"] == "original":
+                # For original strategy, use FF++ as validation
+                val_dataset = selfMAD_Dataset(phase='val', image_size=image_size, datapath=args["FF_path"])
+            else:
+                # For testset_best strategy, use custom morph validation set
+                val_dataset = MorphDataset(
+                    dataset_name=dataset_name,
+                    phase='val',
+                    image_size=image_size,
+                    train_val_split=args.get("train_val_split", 0.8),
+                    csv_path=csv_path
+                )
     else:
         # Use original datasets (FF++ or SMDD)
         train_datapath = args["SMDD_path"] if args["train_dataset"] == "SMDD" else args["FF_path"]

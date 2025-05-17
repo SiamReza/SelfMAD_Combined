@@ -9,10 +9,15 @@ Modify the values in this file to customize the behavior of the automation scrip
 # -----------------
 
 # List of datasets to process
-DATASETS = ["LMA"]  # Options: "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN"
+DATASETS = ["LMA_MIPGAN_I"]  # Options: "LMA", "LMA_UBO", "MIPGAN_I", "MIPGAN_II", "MorDiff", "StyleGAN", "LMA_MIPGAN_I"
+
+# Enable combined dataset loading for training
+# When True, all datasets in DATASETS will be combined for training
+# When False, each dataset will be processed separately
+ENABLE_COMBINED_DATASET = False # DO NOT USE TRUE THAT GIVES ERROR
 
 # Which models to run
-RUN_MODELS = "siam"  # Options: "siam", "main", "both"
+RUN_MODELS = "both"  # Options: "siam", "main", "both"
 
 # Whether to run all models defined in MAIN_MODELS
 # Set to True to run all models, False to run only the model specified in MAIN_MODEL
@@ -31,7 +36,8 @@ DATASET_PATHS = {
     "MIPGAN_I_path": datasets_dir,
     "MIPGAN_II_path": datasets_dir,
     "MorDiff_path": datasets_dir,
-    "StyleGAN_path": datasets_dir
+    "StyleGAN_path": datasets_dir,
+    "LMA_MIPGAN_I_path": datasets_dir
 }
 
 # SelfMAD-siam parameters
@@ -40,8 +46,8 @@ DATASET_PATHS = {
 # Model parameters
 SIAM_MODEL = "vit_mae_large"  # Model type (vit_mae_large)
 SIAM_BATCH_SIZE = 64          # Batch size for training
-SIAM_EPOCHS =100               # Number of epochs for training (reduced for testing)
-SIAM_LEARNING_RATE = 5e-4     # Learning rate for training
+SIAM_EPOCHS =120               # Number of epochs for training (reduced for testing)
+SIAM_LEARNING_RATE = 5e-3     # Learning rate for training
 SIAM_IMAGE_SIZE = 224         # Image size for training (224x224)
 
 # Training parameters
@@ -49,8 +55,8 @@ SIAM_SAVING_STRATEGY = "testset_best"  # Strategy for saving models (original, t
 SIAM_TRAIN_VAL_SPLIT = 0.8             # Train/validation split ratio
 
 # Early stopping parameters (SelfMAD-siam only)
-SIAM_EARLY_STOPPING_PATIENCE = 15      # Patience for early stopping (increased from 5)
-SIAM_EARLY_STOPPING_MONITOR = "val_loss"  # Metric to monitor for early stopping (val_loss, train_loss, val_acc)
+SIAM_EARLY_STOPPING_PATIENCE = 100      # Patience for early stopping (increased from 5)
+SIAM_EARLY_STOPPING_MONITOR = "val_acc"  # Metric to monitor for early stopping (val_loss, train_loss, val_acc)
 
 # Evaluation parameters (SelfMAD-siam only)
 SIAM_CLASSIFICATION_THRESHOLD = 0.5    # Classification threshold for binary classification
@@ -64,7 +70,7 @@ SIAM_VIT_UNFREEZE_LAYERS = 6           # Number of encoder layers to unfreeze (0
 SIAM_VIT_USE_ADAMW = True              # Use AdamW optimizer instead of SAM+SGD
 SIAM_VIT_ENCODER_WEIGHT_DECAY = 0.05   # Weight decay for encoder parameters
 SIAM_VIT_CLASSIFIER_WEIGHT_DECAY = 0.01 # Weight decay for classifier parameters
-SIAM_VIT_WARMUP_PERCENTAGE = 0.2       # Percentage of total steps for learning rate warm-up
+SIAM_VIT_WARMUP_PERCENTAGE = 0.25       # Percentage of total steps for learning rate warm-up
 SIAM_VIT_LABEL_SMOOTHING = 0.1         # Label smoothing factor for CrossEntropyLoss
 SIAM_VIT_GRADIENT_ACCUMULATION_STEPS = 2 # Number of steps to accumulate gradients for large models (4-8 recommended)
 SIAM_VIT_ADVANCED_AUGMENTATIONS = True # Use advanced augmentations for better generalization
@@ -145,6 +151,7 @@ def get_config():
     config = {
         # Common parameters
         "datasets": DATASETS,
+        "enable_combined_dataset": ENABLE_COMBINED_DATASET,
         "run_models": RUN_MODELS,
         "run_all_models": RUN_ALL_MODELS,
         "output_dir": OUTPUT_DIR,

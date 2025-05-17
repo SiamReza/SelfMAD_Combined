@@ -93,7 +93,7 @@ done
 # Check if dataset is provided
 if [ -z "$DATASET" ]; then
   echo "Error: Dataset not specified. Use --dataset option."
-  echo "Available datasets: LMA, LMA_UBO, MIPGAN_I, MIPGAN_II, MorDiff, StyleGAN"
+  echo "Available datasets: LMA, LMA_UBO, MIPGAN_I, MIPGAN_II, MorDiff, StyleGAN, LMA_MIPGAN_I"
   exit 1
 fi
 

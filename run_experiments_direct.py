@@ -551,7 +551,7 @@ def process_model(model_type, dataset, args, results_queue, model_name=None):
                         datasets_dir = os.path.join("..", "datasets")
 
                     print(f"Using datasets directory: {datasets_dir}")
-                    dataset_path_args = f" -LMA_path {datasets_dir} -LMA_UBO_path {datasets_dir} -MIPGAN_I_path {datasets_dir} -MIPGAN_II_path {datasets_dir} -MorDiff_path {datasets_dir} -StyleGAN_path {datasets_dir}"
+                    dataset_path_args = f" -LMA_path {datasets_dir} -LMA_UBO_path {datasets_dir} -MIPGAN_I_path {datasets_dir} -MIPGAN_II_path {datasets_dir} -MorDiff_path {datasets_dir} -StyleGAN_path {datasets_dir} -LMA_MIPGAN_I_path {datasets_dir}"
 
                 # Copy the model file to the model directory if it's not already there
                 # This helps the eval scripts find the model file more easily

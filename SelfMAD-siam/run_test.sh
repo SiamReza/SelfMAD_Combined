@@ -59,7 +59,7 @@ if [ ! -z "$DATASETS" ]; then
   done
 else
   # If no specific datasets are provided, test on all available datasets
-  DATASET_PARAMS="-LMA_path ../datasets -LMA_UBO_path ../datasets -MIPGAN_I_path ../datasets -MIPGAN_II_path ../datasets -MorDiff_path ../datasets -StyleGAN_path ../datasets"
+  DATASET_PARAMS="-LMA_path ../datasets -LMA_UBO_path ../datasets -MIPGAN_I_path ../datasets -MIPGAN_II_path ../datasets -MorDiff_path ../datasets -StyleGAN_path ../datasets -LMA_MIPGAN_I_path ../datasets"
 fi
 
 # Print testing configuration
